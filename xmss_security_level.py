@@ -10,6 +10,7 @@ randomness = 7 * 31  # randomness / seed length log₂|R| in bits
 digest = 8 * 31  # chain / tree hash digest log₂|H| in bits
 lifetime = 1 << 32  # number of signing epochs
 K = 100_000  # max encoding retries (target-sum Winternitz)
+target_sum = 200  # target sum T; encoding outputs x ∈ Z_W^v with ∑x_i = T
 prime = 2**31 - 2**24 + 1  # KoalaBear prime; used for abort correction from [HKKTW26]
 
 # ---------------------------------------------------------------------------
@@ -58,5 +59,18 @@ k_Q = min(
     (bits_R - logqs) / 2 - log5 - log3 - logK,  # randomness
 )
 
+# Expected signing attempts for target-sum encoding
+# |C| = #{x ∈ Z_W^v : ∑x_i = T} via inclusion-exclusion (coefficient of x^T in (1+x+…+x^{W-1})^v)
+W = 1 << w
+C_size = sum(
+    (-1)**j * math.comb(v, j) * math.comb(target_sum - j * W + v - 1, v - 1)
+    for j in range(target_sum // W + 1)
+)
+layer_prob = C_size / W**v  # P(random vertex lands on target layer)
+success_prob = non_abort_total * layer_prob  # P(single attempt succeeds)
+expected_attempts = 1 / success_prob
+signing_failure_log2 = K * math.log2(1 - success_prob)  # log₂ P(all K retries fail)
+
 print(f"classical = {k_C:.2f}")
 print(f"quantum   = {k_Q:.2f}")
+print(f"expected signing attempts = {expected_attempts:.2f}")
